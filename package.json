@@ -1,0 +1,47 @@
+{
+  "name": "@leadertechie/md2editor",
+  "version": "0.0.0",
+  "description": "Framework-agnostic Markdown editor web component with injectable preview rendering",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "vite build",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "markdown",
+    "editor",
+    "web-component",
+    "custom-element",
+    "lit",
+    "syntax"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "jsdom": "^24.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^7.3.1",
+    "vite-plugin-dts": "^4.5.4",
+    "vitest": "^4.1.8"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/leadertechie/md2editor.git"
+  }
+}

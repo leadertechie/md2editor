@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>md2editor demo</title>
+  <style>
+    :root { color-scheme: light; }
+    body {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 2rem;
+      font-family: system-ui, sans-serif;
+    }
+    h1 { font-size: 1.25rem; }
+    md2-editor { height: 70vh; }
+  </style>
+</head>
+<body>
+  <h1>&lt;md2-editor&gt;</h1>
+  <md2-editor placeholder="Write Markdown…"></md2-editor>
+
+  <script type="module">
+    import '../dist/index.js';
+
+    // Tiny demo renderer. A real host should use @leadertechie/md2html,
+    // which sanitises its output.
+    const escape = (value) =>
+      value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    const renderPreview = (markdown) =>
+      escape(markdown)
+        .split(/\n{2,}/)
+        .map((block) => {
+          const heading = block.match(/^(#{1,3})\s+(.*)$/);
+          if (heading) {
+            const level = heading[1].length + 1;
+            return `<h${level}>${heading[2]}</h${level}>`;
+          }
+          return `<p>${block.replace(/\n/g, '<br>')}</p>`;
+        })
+        .join('');
+
+    const editor = document.querySelector('md2-editor');
+    editor.renderPreview = renderPreview;
+    editor.value = '# md2-editor\n\nWrite Markdown on the left, preview on the right.\n\n- **Bold**\n- *Italic*\n- `code`';
+  </script>
+</body>
+</html>

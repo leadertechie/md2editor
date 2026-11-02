@@ -167,8 +167,19 @@ npm run build
 ```
 
 Versioning is handled by GitVersion on `main`; the publish workflow runs
-`npm version <GitVersion.fullSemVer>` and `npm publish --provenance`.
+`npm version <GitVersion.fullSemVer>` and `npm stage publish --provenance`.
 Do not edit `version` in `package.json` by hand.
+
+### Releasing
+
+Merging to `main` **stages** a version instead of publishing it directly, so
+proof-of-presence (2FA) happens at approval time. Approve the staged version
+from the npm package page (Staged publishes) or with:
+
+```bash
+npm stage list
+npm stage approve <stage-id>
+```
 
 ## License
 

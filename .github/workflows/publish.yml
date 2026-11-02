@@ -85,5 +85,10 @@ jobs:
       - name: Update package version
         run: npm version ${{ steps.gitversion.outputs.fullSemVer }} --no-git-tag-version
 
-      - name: Publish to npm
-        run: npm publish --access public --provenance --registry=https://registry.npmjs.org/ --tag latest
+      # The npm trusted publisher is configured for "stage publish".
+      # Staging defers proof-of-presence (2FA) to an explicit approval.
+      - name: Stage package for publishing
+        run: npm stage publish --access public --provenance --registry=https://registry.npmjs.org/ --tag latest
+
+      - name: Show staged versions
+        run: npm stage list --registry=https://registry.npmjs.org/ || true

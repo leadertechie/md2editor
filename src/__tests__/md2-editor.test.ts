@@ -204,11 +204,56 @@ describe('<md2-editor>', () => {
     expect(part(editor, '.content-form').hidden).toBe(true);
   });
 
-  it("locks the raw source and hides the toolbar for structured content", () => {
+  it("locks and hides the raw source for structured content", () => {
     const editor = mount();
     editor.value = '---\ncontent:\n  headline: "Hello"\n---\n';
     expect(textarea(editor).readOnly).toBe(true);
     expect(part(editor, '.toolbar').hidden).toBe(true);
+    expect(part(editor, '.editor').classList.contains('has-content')).toBe(true);
+  });
+
+  it("renders a structured document without exposing the raw frontmatter", () => {
+    const editor = mount();
+    const onChange = vi.fn();
+    editor.addEventListener('md2-editor-change', onChange);
+
+    editor.document = {
+      meta: { parent: '__sys_/base.md', layout: '__sys_/layouts/404.md' },
+      content: { title: 'Missing', cta: 'Home' },
+      body: '',
+    };
+
+    expect(editor.value).toContain('layout: __sys_/layouts/404.md');
+    const form = part(editor, '.content-form');
+    expect(form.hidden).toBe(false);
+
+    const title = form.querySelector('input[data-content-key="title"]') as HTMLInputElement;
+    expect(title.value).toBe('Missing');
+
+    title.value = 'Still missing';
+    title.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(editor.document?.content.title).toBe('Still missing');
+    expect(editor.document?.meta.layout).toBe('__sys_/layouts/404.md');
+    expect((onChange.mock.calls[0][0] as CustomEvent).detail.document.content.title).toBe('Still missing');
+  });
+
+  it("ignores an equivalent structured document update so the form keeps focus", () => {
+    const editor = mount();
+    editor.document = {
+      meta: { layout: '__sys_/layouts/404.md' },
+      content: { title: 'Missing' },
+      body: '',
+    };
+
+    const form = part(editor, '.content-form');
+    editor.document = {
+      meta: { layout: '__sys_/layouts/404.md' },
+      content: { title: 'Missing' },
+      body: '',
+    };
+
+    expect(part(editor, '.content-form')).toBe(form);
   });
 
 });

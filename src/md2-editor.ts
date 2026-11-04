@@ -434,6 +434,7 @@ export class Md2Editor extends HTMLElement {
   private _footerHint!: HTMLElement;
   private _contentForm!: HTMLElement;
   private _parsed: Md2EditorParsed = { meta: {}, content: {}, body: '', hasContent: false };
+  private _structuredMode = false;
 
   constructor() {
     super();
@@ -524,7 +525,7 @@ export class Md2Editor extends HTMLElement {
     const trimmed = this._value.trim();
     const words = trimmed ? trimmed.split(/\s+/).length : 0;
     this._wordCount.textContent = `${words} ${words === 1 ? 'word' : 'words'}`;
-    this._footerHint.textContent = this.hasAttribute('saving') ? 'Saving…' : 'Ctrl/Cmd+S to save';
+    this._footerHint.textContent = this._structuredMode ? 'Structured content — edit the fields above' : (this.hasAttribute('saving') ? 'Saving…' : 'Ctrl/Cmd+S to save');
   }
 
   private get _canPreview(): boolean {
@@ -639,6 +640,9 @@ export class Md2Editor extends HTMLElement {
   private _syncContentForm(): void {
     this._parsed = parseEditorDocument(this._value);
     const hasContent = this._parsed.hasContent;
+    this._structuredMode = hasContent;
+    this._textarea.readOnly = hasContent;
+    this._toolbar.hidden = hasContent;
     const editor = this._root.querySelector('.editor');
     editor?.classList.toggle('has-content', hasContent);
     this._contentForm.hidden = !hasContent;

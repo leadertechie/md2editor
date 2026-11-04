@@ -124,26 +124,53 @@ All events bubble and are composed, so they cross the shadow boundary.
 ### CSS parts
 
 `editor`, `toolbar`, `grid`, `textarea`, `preview`, `preview-content`,
-`preview-error`, `word-count`, `footer`, `footer-hint`.
+`preview-error`, `content-form`, `word-count`, `footer`, `footer-hint`.
 
 ### CSS custom properties
 
-Override on the host or any ancestor:
+The component includes its own styles so it remains usable on a standalone
+page. Override these public variables on `<md2-editor>` to adapt its appearance:
 
 | Property | Default |
 |----------|---------|
+| `--md2-editor-gap-xs` | `var(--space-xs, 0.25lh)` |
 | `--md2-editor-gap` | `var(--space-sm, 0.5lh)` |
 | `--md2-editor-gap-md` | `var(--space-md, 1lh)` |
 | `--md2-editor-radius` | `var(--radius-md, 0.375rem)` |
 | `--md2-editor-radius-sm` | `var(--radius-sm, 0.25rem)` |
+| `--md2-editor-preview-min-width` | `clamp(20rem, 40vw, 22rem)` |
 | `--md2-editor-bg` | `var(--bg-primary, #fcfcfc)` |
+| `--md2-editor-surface` | `var(--bg-secondary, color-mix(...))` |
 | `--md2-editor-text` | `var(--text-primary, #1a1a1a)` |
+| `--md2-editor-muted` | `var(--text-secondary, color-mix(...))` |
 | `--md2-editor-accent` | `var(--brand-color, #0070f3)` |
 | `--md2-editor-danger` | `var(--danger-color, #dc2626)` |
+| `--md2-editor-font` | `var(--font-size-body, clamp(...))` |
+| `--md2-editor-small` | `var(--font-size-small, clamp(...))` |
+| `--md2-editor-mono` | `ui-monospace, SFMono-Regular, Menlo, Consolas, monospace` |
 | `--md2-editor-min-height` | `16lh` |
 
-When the Toldby `core.css` tokens are present, the component inherits the site
-theme automatically (custom properties cross the shadow boundary).
+The component reads the host's color and typography tokens through Shadow DOM.
+For spacing and radius tokens that are registered as non-inheriting in Toldby's
+`core.css`, map the app's local tokens directly onto the component host:
+
+```css
+@layer components {
+  @scope (.admin-app) {
+    .admin-editor-host md2-editor {
+      --md2-editor-gap-xs: var(--admin-gap-xs, 0.25lh);
+      --md2-editor-gap: var(--admin-gap-sm, 0.5lh);
+      --md2-editor-gap-md: var(--admin-gap-md, 1lh);
+      --md2-editor-radius: var(--admin-radius, 0.375rem);
+      --md2-editor-radius-sm: var(--admin-radius-sm, 0.25rem);
+    }
+  }
+}
+```
+
+The bridge is optional and belongs in the consuming app, not this package.
+Use the listed custom properties for broad theming and `::part()` for targeted
+styling; internal shadow-DOM selectors are not a styling API.
 
 ## Preview security
 

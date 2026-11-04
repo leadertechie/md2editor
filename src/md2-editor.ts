@@ -275,6 +275,48 @@ const STYLES = `
   color: var(--md2-editor-muted);
   font-size: var(--md2-editor-small);
 }
+
+.content-form {
+  display: none;
+  flex-direction: column;
+  gap: var(--md2-editor-gap);
+  padding: var(--md2-editor-gap-md);
+  border: var(--md2-editor-border);
+  border-radius: var(--md2-editor-radius-sm);
+  background: var(--md2-editor-surface);
+}
+
+.editor.has-content .content-form {
+  display: flex;
+}
+
+.content-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25lh;
+}
+
+.content-field label {
+  font-size: var(--md2-editor-small);
+  color: var(--md2-editor-muted);
+  text-transform: capitalize;
+}
+
+.content-field input,
+.content-field textarea {
+  width: 100%;
+  padding: var(--space-xs, 0.25lh) var(--md2-editor-gap);
+  border: var(--md2-editor-border);
+  border-radius: var(--md2-editor-radius-sm);
+  background: var(--md2-editor-bg);
+  color: var(--md2-editor-text);
+  font: inherit;
+}
+
+.content-field textarea {
+  min-height: 4lh;
+  resize: vertical;
+}
 `;
 
 const TEMPLATE = `
@@ -294,6 +336,7 @@ const TEMPLATE = `
       <button type="button" class="tool" data-action="preview" aria-label="Toggle preview" aria-pressed="true" hidden>Preview on</button>
     </div>
   </div>
+  <div class="content-form" part="content-form" hidden></div>
   <div class="grid" part="grid">
     <div class="pane">
       <textarea part="textarea" class="input" spellcheck="true"></textarea>
@@ -311,6 +354,62 @@ const TEMPLATE = `
 `;
 
 const DEFAULT_PREVIEW_DELAY = 400;
+
+interface Md2EditorParsed {
+  meta: Record<string, string>;
+  content: Record<string, string>;
+  body: string;
+  hasContent: boolean;
+}
+
+function unquoteEditor(value: string): string {
+  const t = value.trim();
+  if ((t.startsWith('"') && t.endsWith('"')) || (t.startsWith("'") && t.endsWith("'"))) {
+    return t.slice(1, -1);
+  }
+  return t;
+}
+
+function parseEditorDocument(raw: string): Md2EditorParsed {
+  const m = raw.match(/^---\s*\n([\s\S]*?)\n---\s*\n?/);
+  if (!m) return { meta: {}, content: {}, body: raw, hasContent: false };
+
+  const meta: Record<string, string> = {};
+  const content: Record<string, string> = {};
+  let inContent = false;
+
+  for (const line of m[1].split('\n')) {
+    if (!line.trim()) continue;
+    if (inContent && !/^\s/.test(line)) inContent = false;
+    const t = line.trim();
+    if (!inContent && /^content\s*:\s*$/.test(t)) {
+      inContent = true;
+      continue;
+    }
+    const kv = t.match(/^([A-Za-z0-9_.-]+)\s*:\s*(.*)$/);
+    if (!kv) continue;
+    (inContent ? content : meta)[kv[1]] = unquoteEditor(kv[2]);
+  }
+
+  return { meta, content, body: raw.slice(m[0].length), hasContent: Object.keys(content).length > 0 };
+}
+
+function serializeEditorDocument(doc: Md2EditorParsed): string {
+  const quote = (v: string) => (/[:#\n"]/.test(v) ? JSON.stringify(v) : v);
+  const lines = ['---'];
+  for (const [k, v] of Object.entries(doc.meta)) {
+    if (k === 'content') continue;
+    lines.push(`${k}: ${quote(v)}`);
+  }
+  if (doc.hasContent) {
+    lines.push('content:');
+    for (const [k, v] of Object.entries(doc.content)) {
+      lines.push(`  ${k}: ${quote(v)}`);
+    }
+  }
+  lines.push('---');
+  return `${lines.join('\n')}\n${doc.body}`;
+}
 
 export class Md2Editor extends HTMLElement {
   static get observedAttributes(): string[] {
@@ -333,6 +432,8 @@ export class Md2Editor extends HTMLElement {
   private _previewError!: HTMLElement;
   private _wordCount!: HTMLElement;
   private _footerHint!: HTMLElement;
+  private _contentForm!: HTMLElement;
+  private _parsed: Md2EditorParsed = { meta: {}, content: {}, body: '', hasContent: false };
 
   constructor() {
     super();
@@ -351,6 +452,7 @@ export class Md2Editor extends HTMLElement {
       this._textarea.value = value;
     }
     if (this._rendered) {
+      this._syncContentForm();
       this._syncMeta();
       this._schedulePreview();
     }
@@ -397,6 +499,8 @@ export class Md2Editor extends HTMLElement {
     this._previewError = this._root.querySelector('.preview-error') as HTMLElement;
     this._wordCount = this._root.querySelector('.word-count') as HTMLElement;
     this._footerHint = this._root.querySelector('.footer-hint') as HTMLElement;
+    this._contentForm = this._root.querySelector('.content-form') as HTMLElement;
+    this._contentForm.addEventListener('input', this._onContentInput);
 
     this._toolbar.addEventListener('click', this._onToolbarClick);
     this._textarea.addEventListener('input', this._onInput);
@@ -409,6 +513,7 @@ export class Md2Editor extends HTMLElement {
     this._textarea.placeholder = this.getAttribute('placeholder') ?? '';
     this._textarea.setAttribute('aria-label', this.getAttribute('label') ?? 'Markdown content');
     if (this._textarea.value !== this._value) this._textarea.value = this._value;
+    this._syncContentForm();
     this._syncMeta();
     this._syncPreviewButton();
     this._syncPreviewVisibility();
@@ -529,6 +634,50 @@ export class Md2Editor extends HTMLElement {
       element.setSelectionRange(cursor, cursor);
     }, 0);
   }
+
+
+  private _syncContentForm(): void {
+    this._parsed = parseEditorDocument(this._value);
+    const hasContent = this._parsed.hasContent;
+    const editor = this._root.querySelector('.editor');
+    editor?.classList.toggle('has-content', hasContent);
+    this._contentForm.hidden = !hasContent;
+    if (!hasContent) {
+      this._contentForm.innerHTML = '';
+      return;
+    }
+
+    this._contentForm.innerHTML = Object.entries(this._parsed.content)
+      .map(([key, value]) => {
+        const id = `md2-editor-content-${key}`;
+        const isLong = value.length > 40 || value.includes('\n');
+        const escaped = this._escapeHtml(value);
+        return isLong
+          ? `<div class="content-field"><label for="${id}">${key}</label><textarea id="${id}" data-content-key="${key}">${escaped}</textarea></div>`
+          : `<div class="content-field"><label for="${id}">${key}</label><input id="${id}" data-content-key="${key}" value="${this._escapeAttr(value)}"></div>`;
+      })
+      .join('');
+  }
+
+  private _escapeHtml(value: string): string {
+    return value.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c] as string));
+  }
+
+  private _escapeAttr(value: string): string {
+    return value.replace(/[&"<>]/g, (c) => ({ '&': '&amp;', '"': '&quot;', '<': '&lt;', '>': '&gt;' }[c] as string));
+  }
+
+  private readonly _onContentInput = (event: Event): void => {
+    const el = event.target as HTMLInputElement | HTMLTextAreaElement;
+    const key = el.dataset.contentKey;
+    if (!key) return;
+    this._parsed.content[key] = el.value;
+    this._value = serializeEditorDocument(this._parsed);
+    this._textarea.value = this._value;
+    this._syncMeta();
+    this._schedulePreview();
+    this._emitChange();
+  };
 
   private _emitChange(): void {
     this.dispatchEvent(

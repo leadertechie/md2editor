@@ -204,4 +204,11 @@ describe('<md2-editor>', () => {
     expect(part(editor, '.content-form').hidden).toBe(true);
   });
 
+  it("locks the raw source and hides the toolbar for structured content", () => {
+    const editor = mount();
+    editor.value = '---\ncontent:\n  headline: "Hello"\n---\n';
+    expect(textarea(editor).readOnly).toBe(true);
+    expect(part(editor, '.toolbar').hidden).toBe(true);
+  });
+
 });

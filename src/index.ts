@@ -3,6 +3,7 @@ import { Md2Editor } from './md2-editor';
 export { Md2Editor };
 export type {
   PreviewRenderer,
+  Md2EditorDocument,
   Md2EditorChangeDetail,
   Md2EditorPreviewErrorDetail,
 } from './md2-editor';

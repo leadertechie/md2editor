@@ -19,8 +19,20 @@
 
 export type PreviewRenderer = (markdown: string) => string | Promise<string>;
 
+/**
+ * Structured document for views whose frontmatter carries a `content` map.
+ * When supplied, the editor renders only the content fields and never shows
+ * the raw frontmatter shell in the source textarea.
+ */
+export interface Md2EditorDocument {
+  meta: Record<string, string>;
+  content: Record<string, string>;
+  body: string;
+}
+
 export interface Md2EditorChangeDetail {
   value: string;
+  document?: Md2EditorDocument;
 }
 
 export interface Md2EditorPreviewErrorDetail {
@@ -290,6 +302,16 @@ const STYLES = `
   display: flex;
 }
 
+/* Structured views expose only their content fields. The raw frontmatter
+ * shell is code-owned, so the source pane is removed entirely. */
+.editor.has-content .pane {
+  display: none;
+}
+
+.editor.has-content .grid:not(.preview-on) {
+  display: none;
+}
+
 .content-field {
   display: flex;
   flex-direction: column;
@@ -411,6 +433,23 @@ function serializeEditorDocument(doc: Md2EditorParsed): string {
   return `${lines.join('\n')}\n${doc.body}`;
 }
 
+function cloneEditorDocument(doc: Md2EditorDocument): Md2EditorDocument {
+  return {
+    meta: { ...doc.meta },
+    content: { ...doc.content },
+    body: doc.body,
+  };
+}
+
+function documentsEqual(
+  a: Md2EditorDocument | null,
+  b: Md2EditorDocument | null,
+): boolean {
+  if (a === b) return true;
+  if (!a || !b) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export class Md2Editor extends HTMLElement {
   static get observedAttributes(): string[] {
     return ['placeholder', 'label', 'preview-label', 'saving', 'no-preview', 'preview-delay'];
@@ -435,6 +474,7 @@ export class Md2Editor extends HTMLElement {
   private _contentForm!: HTMLElement;
   private _parsed: Md2EditorParsed = { meta: {}, content: {}, body: '', hasContent: false };
   private _structuredMode = false;
+  private _document: Md2EditorDocument | null = null;
 
   constructor() {
     super();
@@ -457,6 +497,30 @@ export class Md2Editor extends HTMLElement {
       this._syncMeta();
       this._schedulePreview();
     }
+  }
+
+  get document(): Md2EditorDocument | null {
+    return this._document ? cloneEditorDocument(this._document) : null;
+  }
+
+  set document(next: Md2EditorDocument | null) {
+    const document = next ? cloneEditorDocument(next) : null;
+    if (documentsEqual(document, this._document)) return;
+    this._document = document;
+    if (!this._rendered) return;
+    if (this._document) {
+      this._parsed = {
+        meta: this._document.meta,
+        content: this._document.content,
+        body: this._document.body,
+        hasContent: Object.keys(this._document.content).length > 0,
+      };
+      this._value = serializeEditorDocument(this._parsed);
+      if (this._textarea.value !== this._value) this._textarea.value = this._value;
+    }
+    this._syncContentForm();
+    this._syncMeta();
+    this._schedulePreview();
   }
 
   get renderPreview(): PreviewRenderer | undefined {
@@ -638,7 +702,14 @@ export class Md2Editor extends HTMLElement {
 
 
   private _syncContentForm(): void {
-    this._parsed = parseEditorDocument(this._value);
+    this._parsed = this._document
+      ? {
+          meta: this._document.meta,
+          content: this._document.content,
+          body: this._document.body,
+          hasContent: Object.keys(this._document.content).length > 0,
+        }
+      : parseEditorDocument(this._value);
     const hasContent = this._parsed.hasContent;
     this._structuredMode = hasContent;
     this._textarea.readOnly = hasContent;
@@ -676,6 +747,9 @@ export class Md2Editor extends HTMLElement {
     const key = el.dataset.contentKey;
     if (!key) return;
     this._parsed.content[key] = el.value;
+    if (this._document) {
+      this._document.content[key] = el.value;
+    }
     this._value = serializeEditorDocument(this._parsed);
     this._textarea.value = this._value;
     this._syncMeta();
@@ -686,7 +760,10 @@ export class Md2Editor extends HTMLElement {
   private _emitChange(): void {
     this.dispatchEvent(
       new CustomEvent<Md2EditorChangeDetail>('md2-editor-change', {
-        detail: { value: this._value },
+        detail: {
+          value: this._value,
+          ...(this._document ? { document: cloneEditorDocument(this._document) } : {}),
+        },
         bubbles: true,
         composed: true,
       }),

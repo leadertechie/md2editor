@@ -179,4 +179,29 @@ describe('<md2-editor>', () => {
     expect(part(editor, '[data-action="preview"]').textContent).toContain('Live');
     expect(part(editor, '.footer-hint').textContent).toBe('Saving…');
   });
+  it("renders a structured form for content frontmatter and re-serializes on edit", () => {
+    const editor = mount();
+    editor.value = '---\nparent: "__sys_/base.md"\nlayout: "__sys_/layouts/register.md"\ncontent:\n  headline: "Hello"\n  cta: "Go"\n---\n';
+
+    const form = part(editor, '.content-form');
+    expect(form.hidden).toBe(false);
+
+    const headline = form.querySelector('input[data-content-key="headline"]') as HTMLInputElement;
+    const cta = form.querySelector('input[data-content-key="cta"]') as HTMLInputElement;
+    expect(headline.value).toBe('Hello');
+    expect(cta.value).toBe('Go');
+
+    headline.value = 'Updated headline';
+    headline.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(editor.value).toContain('headline: Updated headline');
+    expect(editor.value).toContain('cta: Go');
+  });
+
+  it("keeps the raw textarea when there is no content frontmatter", () => {
+    const editor = mount();
+    editor.value = '# plain markdown';
+    expect(part(editor, '.content-form').hidden).toBe(true);
+  });
+
 });
